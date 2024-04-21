@@ -46,6 +46,12 @@ PYTHONQT_GENERATED_PATH = $$PWD/../generated_cpp
         PYTHONQT_GENERATED_PATH = $$PWD/../generated_cpp_515
       }
     }
+    else: equals(QT_MAJOR_VERSION, 6) {
+      # Qt6.7
+      equals(QT_MINOR_VERSION, 7) {
+        PYTHONQT_GENERATED_PATH = $$PWD/../generated_cpp_670
+      }
+    }
 
     !exists($$PYTHONQT_GENERATED_PATH) {
       error("No generated sources exist for Qt$${QT_VERSION}")
