@@ -574,6 +574,7 @@ void delete_QLocale(QLocale* obj) { delete obj; }
    QString  toCurrencyString(QLocale* theWrappedObject, short  i, const QString&  symbol = QString()) const;
    QString  toCurrencyString(QLocale* theWrappedObject, uint  i, const QString&  symbol = QString()) const;
    QString  toCurrencyString(QLocale* theWrappedObject, ushort  i, const QString&  symbol = QString()) const;
+#define DefaultTwoDigitBaseYear 50
    QDate  toDate(QLocale* theWrappedObject, const QString&  string, QLocale::FormatType  arg__2 = QLocale::LongFormat, int  baseYear = DefaultTwoDigitBaseYear) const;
    QDate  toDate(QLocale* theWrappedObject, const QString&  string, QLocale::FormatType  format, QCalendar  cal, int  baseYear = DefaultTwoDigitBaseYear) const;
    QDate  toDate(QLocale* theWrappedObject, const QString&  string, const QString&  format, QCalendar  cal, int  baseYear = DefaultTwoDigitBaseYear) const;
