@@ -38,6 +38,44 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
+
+
+// Qt
+#define QOBJECTDEFS_H
+#define QTMETAMACROS_H
+
+// not yet supported
+#define Q_SLOTS slots
+#define Q_SIGNALS signals
+#define Q_FLAGS(a)
+#define Q_FLAG(a)
+#define Q_PRIVATE_SLOT(a, b)
+#define Q_DECLARE_INTERFACE(a,b)
+#define Q_INTERFACES(a)
+#define Q_GADGET
+#define Q_OVERRIDE(a)
+#define Q_OS_OS2
+#define Q_NO_USING_KEYWORD
+#define Q_DECL_OVERRIDE override
+
+// There are symbols in Qt that exist in Debug but
+// not in release
+#define QT_NO_DEBUG
+
+#define QT_JAMBI_RUN
+
+// Qt6
+#define Q_NAMESPACE_EXPORT(...)
+#define Q_ENUM_NS(x)
+#define Q_FLAG_NS(x)
+#define Q_MOC_INCLUDE(...)
+
+// ignore static_assert
+#define static_assert(...)
+
+
+
+
 // We need to force the endianess in Qt5
 #define Q_BYTE_ORDER Q_LITTLE_ENDIAN
 
@@ -73,6 +111,19 @@
 #   undef Q_CLANG_QDOC
 #endif
 
+
+#if QT_VERSION >= 0x060700
+
+// adjust macro to work with simplecpp
+#define QT_OVERLOADED_MACRO(MACRO, ...) QT_OVERLOADED_MACRO_IMP(MACRO, QT_VA_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+ 
+#endif
+
+// Workaround: Modify definition of QT_DEFINE_TAG to not include type definition in variable definition,
+// which is currently not handled by the generator parser - and also isn't needed for the wrappers, as far as I can see
+// Note: This fixes some missing enums from qnamespace.h in Qt 6.8
+#define QT_DEFINE_TAG(x) constexpr struct x##_t x;
+
 // it seems this can be safely ignored (otherwise generator currently stumbles over use of noexcept):
 #define Q_DECLARE_SHARED(TYPE)
 #define Q_DECLARE_SHARED_NOT_MOVABLE_UNTIL_QT6(TYPE)
@@ -92,8 +143,11 @@
 #define QDOC_PROPERTY(text) Q_PROPERTY(text)
 
 // don't need this:
-#define Q_REVISION(v)
+#define Q_REVISION(...)
 #define Q_DECLARE_OPERATORS_FOR_FLAGS(x)
+#define Q_GADGET_EXPORT(x)
+#define Q_DECLARE_TYPEINFO(...)
+#define Q_DECLARE_MIXED_ENUM_OPERATORS_SYMMETRIC(...)
 
 #include <QtCore/QMetaType>
 

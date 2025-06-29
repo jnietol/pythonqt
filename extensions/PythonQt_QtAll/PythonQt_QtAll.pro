@@ -27,7 +27,7 @@ isEmpty( PYTHONQTALL_CONFIG ) {
 } else {
   message("using given PythonQt_QtAll Configuration: ")
   message("  $${PYTHONQTALL_CONFIG}")
-  CONFIG += $${PYTHONQTALL_CONFIG}
+  eval(CONFIG += $${PYTHONQTALL_CONFIG})
 }
 
 TARGET   = PythonQt_QtAll-Qt$${QT_MAJOR_VERSION}-PythonXY
@@ -68,6 +68,8 @@ unix {
 
 unix: target.path = $${INSTALL_PREFIX}/lib
 win32: target.path = /
+
+msvc:QMAKE_CXXFLAGS += /bigobj
 
 headers.files = $${HEADERS}
 headers.path = $${INSTALL_PREFIX}/include

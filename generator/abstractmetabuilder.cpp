@@ -270,7 +270,7 @@ void AbstractMetaBuilder::traverseCompareOperator(FunctionModelItem item) {
                 meta_function->setOriginalAttributes(meta_function->attributes());
                 setupFunctionDefaults(meta_function, comparer_class);
 
-                comparer_class->addFunction(meta_function);
+                comparer_class->addFunction(meta_function, /*check_duplicates=*/true);
             } else if (meta_function != 0) {
                 delete meta_function;
             }
@@ -315,7 +315,7 @@ void AbstractMetaBuilder::traverseStreamOperator(FunctionModelItem item)
 
                 setupFunctionDefaults(streamFunction, streamedClass);
 
-                streamedClass->addFunction(streamFunction);
+                streamedClass->addFunction(streamFunction, /*check_duplicates=*/true);
                 streamedClass->typeEntry()->addExtraInclude(streamClass->typeEntry()->include());
 
                 m_current_class = old_current_class;
@@ -324,12 +324,12 @@ void AbstractMetaBuilder::traverseStreamOperator(FunctionModelItem item)
     }
 }
 
-void AbstractMetaBuilder::traverseBinaryArithmeticOperator(FunctionModelItem item)
+void AbstractMetaBuilder::traverseArithmeticOperator(FunctionModelItem item)
 {
   ArgumentList arguments = item->arguments();
-  if (arguments.size() == 2 && item->accessPolicy() == CodeModel::Public) {
+  if ((arguments.size() == 1 || arguments.size() == 2) && item->accessPolicy() == CodeModel::Public) {
     AbstractMetaClass *aClass = argumentToClass(arguments.at(0));
-    AbstractMetaClass *bClass = argumentToClass(arguments.at(1));
+    AbstractMetaClass *bClass = arguments.size() == 2 ? argumentToClass(arguments.at(1)) : nullptr;
 
     if (!aClass) return;
 
@@ -354,7 +354,7 @@ void AbstractMetaBuilder::traverseBinaryArithmeticOperator(FunctionModelItem ite
 
       setupFunctionDefaults(streamFunction, aClass);
 
-      aClass->addFunction(streamFunction);
+      aClass->addFunction(streamFunction, /*check_duplicates=*/true);
       if (bClass) {
         aClass->typeEntry()->addExtraInclude(bClass->typeEntry()->include());
       }
@@ -597,9 +597,10 @@ bool AbstractMetaBuilder::build()
           m_dom->findFunctions("operator+") + m_dom->findFunctions("operator-")
         + m_dom->findFunctions("operator/") + m_dom->findFunctions("operator*")
         + m_dom->findFunctions("operator&") + m_dom->findFunctions("operator|")
-        + m_dom->findFunctions("operator%") + m_dom->findFunctions("operator^");
+        + m_dom->findFunctions("operator%") + m_dom->findFunctions("operator^")
+        + m_dom->findFunctions("operator!") + m_dom->findFunctions("operator~");
       for (FunctionModelItem item :  stream_operators) {
-        traverseBinaryArithmeticOperator(item);
+        traverseArithmeticOperator(item);
       }
     }
     {
@@ -1136,10 +1137,15 @@ void AbstractMetaBuilder::traverseFunctions(ScopeModelItem scope_item, AbstractM
             if (meta_function->isDestructor() && !meta_function->isFinal())
                 meta_class->setForceShellClass(true);
 
-            if (!meta_function->isDestructor()
-                && !meta_function->isInvalid()
-                && (!meta_function->isConstructor() || !meta_function->isPrivate())) {
-
+            if (meta_function->name().startsWith("__") && meta_function->isStatic()) {
+                // static operators are not supported by PythonQt
+                // (this only seems to happen for static operators in namespaces)
+                delete meta_function;
+            }
+            else if (!meta_function->isDestructor()
+                     && !meta_function->isInvalid()
+                     && (!meta_function->isConstructor() || !meta_function->isPrivate()))
+            {
                 if (meta_class->typeEntry()->designatedInterface() && !meta_function->isPublic()
                     && !meta_function->isPrivate()) {
                     QString warn = QString("non-public function '%1' in interface '%2'")
@@ -1163,7 +1169,7 @@ void AbstractMetaBuilder::traverseFunctions(ScopeModelItem scope_item, AbstractM
                     ReportHandler::warning(warn);
                 }
 
-                meta_class->addFunction(meta_function);
+                meta_class->addFunction(meta_function, /*check_duplicates=*/true);
             } else if (meta_function->isDestructor()) {
                 meta_class->setDestructorException(meta_function->exception());
                 if (!meta_function->isPublic()) {

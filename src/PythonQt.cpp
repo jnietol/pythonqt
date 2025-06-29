@@ -348,12 +348,6 @@ PythonQt::PythonQt(int flags, const QByteArray& pythonQtModuleName)
     Py_Initialize();
   }
 
-#ifdef PYTHONQT_FULL_THREAD_SUPPORT
-  if (!PyEval_ThreadsInitialized()) {
-    PyEval_InitThreads();
-  }
-#endif
-
   // add our own python object types for qt object slots
   if (PyType_Ready(&PythonQtSlotFunction_Type) < 0) {
     std::cerr << "could not initialize PythonQtSlotFunction_Type" << ", in " << __FILE__ << ":" << __LINE__ << std::endl;
@@ -564,14 +558,15 @@ void PythonQtPrivate::registerClass(const QMetaObject* metaobject, const char* p
         PythonQtClassInfo* parentInfo = lookupClassInfoAndCreateIfNotPresent(m->superClass()->className());
         info->addParentClass(PythonQtClassInfo::ParentClassInfo(parentInfo));
       }
-    } else if (first && module) {
+    } else if (first && (module || (package && package[0]))) {
       // There is a wrapper already, but if we got a module, we want to place the wrapper into that module as well,
       // since it might have been placed into "private" earlier on.
       // If the wrapper was already added to module before, it is just readded, which does no harm.
       PyObject* classWrapper = info->pythonQtClassWrapper();
       // AddObject steals a reference, so we need to INCREF
       Py_INCREF(classWrapper);
-      if (PyModule_AddObject(module, info->className(), classWrapper) < 0) {
+      PyObject* pack = module ? module : packageByName(package); // same logic like in createPythonQtClassWrapper
+      if (PyModule_AddObject(pack, info->className(), classWrapper) < 0) {
          Py_DECREF(classWrapper);
       }
     }
@@ -1898,7 +1893,11 @@ void PythonQt::initPythonQtModule(bool redirectStdOut, const QByteArray& pythonQ
   Py_XDECREF(old_module_names);
 
 #ifdef PY3K
-  PyDict_SetItem(PyObject_GetAttrString(sys.object(), "modules"), PyUnicode_FromString(name.constData()), _p->_pythonQtModule.object());
+  PyObject* modulesAttr = PyObject_GetAttrString(sys.object(), "modules");
+  PyObject* pyUnicodeObject = PyUnicode_FromString(name.constData());
+  PyDict_SetItem(modulesAttr, pyUnicodeObject, _p->_pythonQtModule.object());
+  Py_XDECREF(modulesAttr);
+  Py_XDECREF(pyUnicodeObject);
 #endif
 }
 

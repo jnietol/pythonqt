@@ -69,6 +69,9 @@ void LocationManager::extract_line(int offset, int *line, QString *filename) con
   const unsigned char *cursor = begin_buffer + offset;
 
   ++cursor; // skip '#'
+  if (cursor[0] == 'l' && cursor[1] == 'i' && cursor[2] == 'n' && cursor[3] == 'e') {
+    cursor += 4;
+  }
   if (std::isspace(*cursor) && std::isdigit(*(cursor + 1)))
     {
       ++cursor;
@@ -243,9 +246,9 @@ void Lexer::scan_preprocessor()
       reportError("expected newline");
 }
 
-void Lexer::scan_char_constant()
+void Lexer::scan_char_constant_with_prefix(const unsigned char* prefix)
 {
-  const unsigned char *begin = cursor;
+  const unsigned char *begin = prefix ? prefix : cursor;
 
   ++cursor;
   while (*cursor && *cursor != '\'')
@@ -269,9 +272,9 @@ void Lexer::scan_char_constant()
   token_stream[(int) index++].kind = Token_char_literal;
 }
 
-void Lexer::scan_string_constant()
+void Lexer::scan_string_constant_with_prefix(const unsigned char* prefix)
 {
-  const unsigned char *begin = cursor;
+  const unsigned char *begin = prefix ? prefix : cursor;
 
   ++cursor;
   while (*cursor && *cursor != '"')
@@ -293,6 +296,71 @@ void Lexer::scan_string_constant()
     control->findOrInsertName((const char*) begin, cursor - begin);
 
   token_stream[(int) index++].kind = Token_string_literal;
+}
+
+void Lexer::scan_raw_string_constant_with_prefix(const unsigned char* prefix)
+{
+  // always starts with "
+  const unsigned char* begin = prefix ? prefix : cursor;
+  int delimiterLength = 0;
+  int endSequenceLength = 0;
+  bool stillValidDelimiter = true;
+  ++cursor;
+  while (*cursor)
+  {
+    if (!delimiterLength)
+    {
+      if (*cursor == '"')
+      {
+        break;
+      }
+      else if (*cursor == '\n')
+      {
+        // this would probably not be a valid delimiter
+        stillValidDelimiter = false;
+      }
+      else if (stillValidDelimiter  && *cursor == '(' && (cursor - begin) < 16)
+      {
+        // delimiter sequence identified (see https://en.cppreference.com/w/cpp/language/string_literal)
+        delimiterLength = cursor - begin;
+      }
+    }
+    else if (endSequenceLength)
+    {
+      // possible end delimiter sequence
+      if (endSequenceLength == delimiterLength && *cursor == '"')
+      {
+        break;
+      }
+      else if (endSequenceLength < delimiterLength && *cursor == begin[endSequenceLength])
+      {
+        endSequenceLength++;
+      }
+      else
+      {
+        // this is not the end of the string, go back to
+        // after the starting ')' and try again
+        cursor -= endSequenceLength;
+        endSequenceLength = 0;
+      }
+    }
+    else if (*cursor == ')')
+    {
+      // this might be the start of the end delimiter sequence
+      endSequenceLength = 1;
+    }
+    ++cursor;
+  }
+
+  if (*cursor != '"')
+    reportError("expected \"");
+
+  ++cursor;
+
+  token_stream[(int)index].extra.symbol =
+    control->findOrInsertName((const char*)begin, cursor - begin);
+
+  token_stream[(int)index++].kind = Token_string_literal;
 }
 
 void Lexer::scan_newline()
@@ -338,20 +406,44 @@ void Lexer::scan_identifier_or_literal()
 void Lexer::scan_identifier_or_keyword()
 {
   const unsigned char *skip = cursor;
+  const unsigned char* start = cursor;
   while (isalnum(*skip) || *skip== '_')
     ++skip;
 
   int n = skip - cursor;
-  Token *current_token = &token_stream[(int) index];
-  (this->*s_scan_keyword_table[n < 17 ? n : 0])();
+  if (*skip == '"' && n <= 3)
+  {
+    cursor = skip;
+    // this should be a unicode and/or raw string -
+    // we pass through anything that does not follow the standard, though
+    if (skip[-1] == 'R')
+    {
+      scan_raw_string_constant_with_prefix(start);
+    }
+    else
+    {
+      scan_string_constant_with_prefix(start);
+    }
+  }
+  else if (*skip == '\'' && n <= 2)
+  {
+    // probably some special encoding
+    cursor = skip;
+    scan_char_constant_with_prefix(start);
+  }
+  else
+  {
+    Token* current_token = &token_stream[(int)index];
+    (this->*s_scan_keyword_table[n < 17 ? n : 0])();
 
-  if (current_token->kind == Token_identifier)
+    if (current_token->kind == Token_identifier)
     {
       current_token->extra.symbol =
-        control->findOrInsertName((const char*) cursor, n);
+        control->findOrInsertName((const char*)cursor, n);
     }
 
-  cursor = skip;
+    cursor = skip;
+  }
 }
 
 void Lexer::scan_int_constant()

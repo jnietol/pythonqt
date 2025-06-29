@@ -135,6 +135,20 @@ namespace {
   }
 }
 
+namespace {
+
+  QString trimSpaces(const QString& expr)
+  {
+    QString result = expr;
+    if (!result.contains("\"") && !result.contains("'")) {
+      // assume all spaces are expendable (some new spaces were introduced by the new simplecpp preprocessor)
+      result.replace(" ", "");
+    }
+    return result;
+  }
+
+};
+
 
 void ShellGenerator::writeFunctionArguments(QTextStream &s,
                                             const AbstractMetaFunction *meta_function,
@@ -167,9 +181,9 @@ void ShellGenerator::writeFunctionArguments(QTextStream &s,
           }
         }
         if ((option & IncludeDefaultExpression) && !arg->defaultValueExpression().isEmpty()) {
-            s << " = "; 
+          s << " = "; 
 
-            QString expr = arg->defaultValueExpression();
+          QString expr = trimSpaces(arg->defaultValueExpression());
           if (expr == "NULL")
           {
             expr = "nullptr";
@@ -185,7 +199,7 @@ void ShellGenerator::writeFunctionArguments(QTextStream &s,
               if (pos > 0) {
                 QString typeName = expr.left(pos);
                 AbstractMetaEnum* enumType = findEnumTypeOfClass(_currentScope, typeName);
-                if (enumType && enumType->typeEntry()->isEnumClass()) {
+                if (enumType) {
                   // prepend original class name, otherwise the new enum type from the wrapper will be used,
                   // which is not compatible
                   qualifier = _currentScope->name();
@@ -316,7 +330,7 @@ bool ShellGenerator::functionHasNonConstReferences(const AbstractMetaFunction* f
       QTextStream t(&s);
       t << function->implementingClass()->qualifiedCppName() << "::";
       writeFunctionSignature(t, function, 0, "",
-        Option(ConvertReferenceToPtr | FirstArgIsWrappedObject | IncludeDefaultExpression | OriginalName | ShowStatic | UnderscoreSpaces | ProtectedEnumAsInts));
+        Option(ConvertReferenceToPtr | FirstArgIsWrappedObject | IncludeDefaultExpression | ShowStatic | UnderscoreSpaces | ProtectedEnumAsInts));
       std::cout << s.toLatin1().constData() << std::endl;
       return true;
     }
